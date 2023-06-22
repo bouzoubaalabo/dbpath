@@ -9,7 +9,40 @@ root = tk.Tk()
 root.title("bdtkinter")
 
 
-# root.geometry("400x400")
+#root.geometry("400x400")
+
+# Je crée une table encaissements avec les champs suivants :id_encaissement, date_encaissement, encaissement, id_analyse    # Je crée une table encaissements avec les champs suivants :id_encaissement, date_encaissement, encaissement, id_analyse
+mydb = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    passwd="",
+    database="Codemy",
+)
+my_cursor = mydb.cursor()
+my_cursor.execute("DESCRIBE encaissements")
+for column in my_cursor:
+    print(column)
+my_cursor.close()
+
+#Je crée des entrées pour les champs de la table encaissements
+
+def add_encaissement():
+    id_analyse = id_entry.get()
+    mydb = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    passwd="",
+    database="Codemy",
+)
+    my_cursor = mydb.cursor()
+    date_encaissement = date_encaissement_entry.get()
+    encaissement = encaissement_entry.get()
+    id_analyse = id_entry.get()
+    
+    my_cursor.execute("INSERT INTO encaissements (date_encaissement, encaissement, id_analyse) VALUES (%s, %s, %s)", (date_encaissement, encaissement, id_analyse))
+    mydb.commit()
+    messagebox.showinfo("Info", "Enregistrement ajouté")
+    my_cursor.close()
 
 
 def get_ref_analyse_list(mydb=None):
@@ -123,6 +156,20 @@ def fetch_data():
     my_cursor.close()
     return rows
 
+def fetch_data_encaiss():
+    id_analyse = id_entry.get()
+    mydb = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="Codemy",
+    )
+    my_cursor = mydb.cursor()
+    my_cursor.execute("SELECT date_encaissement, encaissement, id_analyse FROM encaissements WHERE id_analyse = %s", (id_analyse,))
+    rows = my_cursor.fetchall()
+    mydb.commit()
+    my_cursor.close()
+    return rows
 
 print("About to run query 2")
 
@@ -195,6 +242,10 @@ def clear_entries():
 def populate_table(tree):
     for row in fetch_data():
         tree.insert("", 'end', values=row)
+        
+def populate_table_encaiss(tree_encaiss):
+    for row in fetch_data_encaiss():
+        tree_encaiss.insert("", 'end', values=row)
 
 
 def search_by_ref(Event=None):
@@ -234,31 +285,72 @@ def search_by_ref(Event=None):
     else:
         messagebox.showwarning("Erreur", "Aucun enregistrement trouvé avec cette référence d'analyse")
     my_cursor.close()
-
+print("About to run query 3")
 
 frame_analyses = tk.Frame(root, bg="red")
 frame_analyses.grid(row=0, column=1, padx=20, pady=20)
 
-tree = ttk.Treeview(frame_analyses, height=10, columns=("ref_analyse", "type_analyse"))
+framep = tk.Frame(root)
+framep.grid(row=0, column=0, padx=20, pady=20)
+
+frame2= tk.Frame(root)
+frame2.grid(row=0, column=1, padx=20, pady=20)
+
+frame_encaiss= tk.Frame(frame2, bg="green")
+frame_encaiss.grid(row=0, column=0, padx=20, pady=20)
+
+search = tk.Frame(framep, bg="yellow")
+search.grid(row=0, column=0, padx=10, pady=10)
+
+saisie = tk.Frame(framep, bg="#eaeaea")
+saisie.grid(row=1, column=0, padx=20, pady=20)
+
+date_encaissement_label = tk.Label(frame_encaiss, text="Date d'encaissement")
+date_encaissement_label.grid(row=0, column=0, padx=20, pady=20)
+
+date_encaissement_entry = tk.Entry(frame_encaiss)
+date_encaissement_entry.grid(row=0, column=1, padx=20, pady=20)
+date_encaissement_entry.insert(0, date.today().strftime("%d/%m/%y"))
+
+encaissement_label = tk.Label(frame_encaiss, text="Encaissement")
+encaissement_label.grid(row=1, column=0, padx=20, pady=20)
+
+encaissement_entry = tk.Entry(frame_encaiss)
+encaissement_entry.grid(row=1, column=1, padx=20, pady=20)
+
+submit_button = tk.Button(frame_encaiss, text="Ajouter")
+submit_button.grid(row=2, column=0, padx=20, pady=20)
+"""
+date_encaiss_label = tk.Label(frame_encaiss, text="Date d'encaissement", bg="green")
+date_encaiss_label.grid(row=0, column=0, padx=20, pady=20)
+entryDateEncaiss = tk.Entry(frame_encaiss, width=20, borderwidth=5)
+entryDateEncaiss.grid(row=0, column=1, padx=20, pady=20)
+"""
+#entryDateR.insert(0, date.today().strftime("%d/%m/%y"))
+
+tree_encaiss = ttk.Treeview(frame2, height=10, columns=("date_encaiss", "encaissement"))
+tree_encaiss['show'] = 'headings'
+
+# Assuming your table has these columns. Modify as necessary.
+tree_encaiss.grid(row=1, column=0, columnspan=3, padx=20, pady=20)
+tree_encaiss["columns"] = ("ref_analyse", "type_analyse")
+for col in tree_encaiss["columns"]:
+    tree_encaiss.column(col, width=100)
+    tree_encaiss.heading(col, text=col)
+
+tree = ttk.Treeview(frame2, height=10, columns=("ref_analyse", "type_analyse"))
 tree['show'] = 'headings'
 
 # Assuming your table has these columns. Modify as necessary.
-tree.grid(row=0, column=0, columnspan=3, padx=20, pady=20)
+tree.grid(row=2, column=0, columnspan=3, padx=20, pady=20)
 tree["columns"] = ("ref_analyse", "type_analyse")
 for col in tree["columns"]:
     tree.column(col, width=100)
     tree.heading(col, text=col)
+    
 # Appeler la fonction populate_table
 populate_table(tree)
-
-framep = tk.Frame(root)
-framep.grid(row=0, column=0, padx=20, pady=20)
-
-search = tk.Frame(framep, bg="#eaeaee")
-search.grid(row=0, column=0, padx=20, pady=20)
-
-saisie = tk.Frame(framep, bg="#eaeaea")
-saisie.grid(row=1, column=0, padx=20, pady=20)
+populate_table_encaiss(tree_encaiss)
 
 # saisie = tk.LabelFrame(root, text="Saisie des données")
 
@@ -277,7 +369,7 @@ search_entry.bind("<Return>", search_by_ref)
 
 id_label = tk.Label(saisie, text="Id_analyse")
 id_label.grid(row=0, column=0, sticky="e", padx=10, pady=5)
-id_entry = tk.Entry(saisie, state="readonly")
+id_entry = tk.Entry(saisie)
 id_entry.grid(row=0, column=1, padx=20, pady=5)
 
 ref_label = tk.Label(saisie, text="Ref_analyse", )

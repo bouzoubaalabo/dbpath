@@ -4,6 +4,8 @@ from urllib import response
 
 import mysql.connector
 from tkinter import IntVar, StringVar, ttk, messagebox, END
+import tkinter.tix as tix
+
 
 root = tk.Tk()
 root.title("bdtkinter")
@@ -11,6 +13,7 @@ root.title("bdtkinter")
 
 #root.geometry("400x400")
 
+#vérifier le dernier add git
 # Je crée une table encaissements avec les champs suivants :id_encaissement, date_encaissement, encaissement, id_analyse    # Je crée une table encaissements avec les champs suivants :id_encaissement, date_encaissement, encaissement, id_analyse
 mydb = mysql.connector.connect(
     host="localhost",
@@ -19,30 +22,57 @@ mydb = mysql.connector.connect(
     database="Codemy",
 )
 my_cursor = mydb.cursor()
+"""
 my_cursor.execute("DESCRIBE encaissements")
 for column in my_cursor:
     print(column)
-my_cursor.close()
+"""
+my_cursor.execute("SELECT * FROM encaissements")
 
+# Récupérer les résultats
+results = my_cursor.fetchall()
+my_cursor.close()
+# Exécuter la requête de sélectionclea
+
+# Afficher les enregistrements
+for row in results:
+    print(row)
 #Je crée des entrées pour les champs de la table encaissements
+
+
 
 def add_encaissement():
     id_analyse = id_entry.get()
     mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd="",
-    database="Codemy",
-)
+        host="localhost",
+        user="root",
+        passwd="",
+        database="Codemy",
+    )
     my_cursor = mydb.cursor()
     date_encaissement = date_encaissement_entry.get()
     encaissement = encaissement_entry.get()
-    id_analyse = id_entry.get()
-    
-    my_cursor.execute("INSERT INTO encaissements (date_encaissement, encaissement, id_analyse) VALUES (%s, %s, %s)", (date_encaissement, encaissement, id_analyse))
-    mydb.commit()
-    messagebox.showinfo("Info", "Enregistrement ajouté")
+
+    print(f"Adding encaissement: {date_encaissement}, {encaissement}, {id_analyse}")  # Debug print
+
+    try:
+        my_cursor.execute("INSERT INTO encaissements (date_encaissement, encaissement, id_analyse) VALUES (%s, %s, %s)", (date_encaissement, encaissement, id_analyse))
+        mydb.commit()
+        print("Insert query executed successfully")  # Debug print
+        messagebox.showinfo("Info", "Enregistrement ajouté")
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        
     my_cursor.close()
+    # appelez la fonction chaque fois que vous ajoutez, supprimez ou modifiez une ligne dans le treeview
+    update_total_encaissement()
+
+def update_total_encaissement():
+    total = 0
+    for child in tree_encaiss.get_children():
+        total += float(tree_encaiss.item(child)["values"][1])  # suppose que 'encaissement' est la deuxième colonne
+    encaiss_entry.delete(0, 'end')
+    encaiss_entry.insert(0, total)
 
 
 def get_ref_analyse_list(mydb=None):
@@ -242,10 +272,70 @@ def clear_entries():
 def populate_table(tree):
     for row in fetch_data():
         tree.insert("", 'end', values=row)
-        
-def populate_table_encaiss(tree_encaiss):
-    for row in fetch_data_encaiss():
-        tree_encaiss.insert("", 'end', values=row)
+
+class Encaiss:
+    print("Entered Encaiss class")
+    def __init__(self, id_analyse):
+        self.id_analyse = id_analyse
+        self.mydb = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            passwd="",
+            database="Codemy",
+        )
+        self.my_cursor = self.mydb.cursor()
+    print("Cursor created1")
+    def fetch_data_encaiss(self):
+        self.my_cursor.execute("SELECT date_encaissement, encaissement, id_analyse FROM encaissements WHERE id_analyse = %s", (self.id_analyse,))
+        rows = self.my_cursor.fetchall()
+        return rows
+    print("Cursor created2")
+
+    def populate_encaiss(self, tree_encaiss):
+        for row in self.fetch_data_encaiss():
+            tree_encaiss.insert("", 'end', values=row)
+    print("Cursor created3")
+
+def populate_combobox_search_by_ref(search_entry):
+    mydb = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="Codemy",
+    )
+    my_cursor = mydb.cursor()
+
+    # Remplir la liste déroulante pour la recherche par nom
+    my_cursor.execute("SELECT DISTINCT ref_analyse FROM analyses ORDER BY ref_analyse ASC")
+    ref_analyses = [row[0] for row in my_cursor.fetchall()]
+    search_entry['values'] = ref_analyses
+    my_cursor.close()
+
+def on_keyrelease(event):
+    # get text from entry
+    value = event.widget.get()
+    value = value.strip()
+    
+    # get data from ref_analyse
+    if value == '':
+        search_entry['values'] = ref_analyse
+    else:
+        data = []
+        for item in ref_analyse:
+            if value in item:
+                data.append(item)           
+        search_entry['values'] = data
+
+mydb = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    passwd="",
+    database="Codemy",
+)
+my_cursor = mydb.cursor()
+my_cursor.execute("SELECT DISTINCT ref_analyse FROM analyses ORDER BY ref_analyse ASC")
+ref_analyse = [row[0] for row in my_cursor.fetchall()]
+my_cursor.close()
 
 
 def search_by_ref(Event=None):
@@ -256,10 +346,12 @@ def search_by_ref(Event=None):
         database="Codemy",
     )
     my_cursor = mydb.cursor()
+    print("cursor search_by_ref created")
     # Obtenir l'enregistrement d'analyse par ref_analyse
     ref_analyse = search_entry.get()
     my_cursor.execute("SELECT * FROM analyses WHERE ref_analyse = %s", (ref_analyse,))
     row = my_cursor.fetchone()
+    print("row = ", row)
     # Supprimer les valeurs actuelles des entrées
     clear_entries()
     if row is not None:
@@ -282,28 +374,38 @@ def search_by_ref(Event=None):
         encaiss_entry.insert(0, row[11])
         remise_entry.insert(0, row[12])
         reste_entry.insert(0, row[13])
+        print("recherche terminée")
+        # Créer une nouvelle instance de Encaiss et peupler la table
+        encaiss = Encaiss(row[0])
+        print("encaiss created")
+        tree_encaiss.delete(*tree_encaiss.get_children())  # vider le tree_encaiss
+        encaiss.populate_encaiss(tree_encaiss)
+        print('populate_encaiss done')
+        
     else:
         messagebox.showwarning("Erreur", "Aucun enregistrement trouvé avec cette référence d'analyse")
+    
     my_cursor.close()
+    mydb.close()
 print("About to run query 3")
 
 frame_analyses = tk.Frame(root, bg="red")
-frame_analyses.grid(row=0, column=1, padx=20, pady=20)
+frame_analyses.grid(row=0, column=1, padx=5, pady=5)
 
 framep = tk.Frame(root)
-framep.grid(row=0, column=0, padx=20, pady=20)
+framep.grid(row=0, column=0, padx=5, pady=5)
 
 frame2= tk.Frame(root)
-frame2.grid(row=0, column=1, padx=20, pady=20)
+frame2.grid(row=0, column=1, padx=(5), pady=5)
 
 frame_encaiss= tk.Frame(frame2, bg="green")
-frame_encaiss.grid(row=0, column=0, padx=20, pady=20)
+frame_encaiss.grid(row=0, column=0, padx=5, pady=5)
 
 search = tk.Frame(framep, bg="yellow")
 search.grid(row=0, column=0, padx=10, pady=10)
 
 saisie = tk.Frame(framep, bg="#eaeaea")
-saisie.grid(row=1, column=0, padx=20, pady=20)
+saisie.grid(row=1, column=0, padx=5, pady=5)
 
 date_encaissement_label = tk.Label(frame_encaiss, text="Date d'encaissement")
 date_encaissement_label.grid(row=0, column=0, padx=20, pady=20)
@@ -312,21 +414,17 @@ date_encaissement_entry = tk.Entry(frame_encaiss)
 date_encaissement_entry.grid(row=0, column=1, padx=20, pady=20)
 date_encaissement_entry.insert(0, date.today().strftime("%d/%m/%y"))
 
+
 encaissement_label = tk.Label(frame_encaiss, text="Encaissement")
 encaissement_label.grid(row=1, column=0, padx=20, pady=20)
 
 encaissement_entry = tk.Entry(frame_encaiss)
 encaissement_entry.grid(row=1, column=1, padx=20, pady=20)
 
-submit_button = tk.Button(frame_encaiss, text="Ajouter")
+submit_button = tk.Button(frame_encaiss, text="Ajouter", command= add_encaissement)
 submit_button.grid(row=2, column=0, padx=20, pady=20)
-"""
-date_encaiss_label = tk.Label(frame_encaiss, text="Date d'encaissement", bg="green")
-date_encaiss_label.grid(row=0, column=0, padx=20, pady=20)
-entryDateEncaiss = tk.Entry(frame_encaiss, width=20, borderwidth=5)
-entryDateEncaiss.grid(row=0, column=1, padx=20, pady=20)
-"""
-#entryDateR.insert(0, date.today().strftime("%d/%m/%y"))
+
+
 
 tree_encaiss = ttk.Treeview(frame2, height=10, columns=("date_encaiss", "encaissement"))
 tree_encaiss['show'] = 'headings'
@@ -350,7 +448,8 @@ for col in tree["columns"]:
     
 # Appeler la fonction populate_table
 populate_table(tree)
-populate_table_encaiss(tree_encaiss)
+
+
 
 # saisie = tk.LabelFrame(root, text="Saisie des données")
 
@@ -363,9 +462,16 @@ check_var = IntVar()
 # Eiquettes + Entrys
 search_label = tk.Label(search, text="Recherche")
 search_label.grid(row=0, column=0, padx=10, pady=5)
-search_entry = tk.Entry(search)
+
+search_entry = ttk.Combobox(search)
 search_entry.grid(row=0, column=1, padx=20, pady=5)
-search_entry.bind("<Return>", search_by_ref)
+
+search_entry.bind('<KeyRelease>', on_keyrelease)
+search_entry.bind("<<ComboboxSelected>>", search_by_ref)
+
+# Appeler la fonction pour peupler les listes déroulantes au démarrage
+populate_combobox_search_by_ref(search_entry)
+
 
 id_label = tk.Label(saisie, text="Id_analyse")
 id_label.grid(row=0, column=0, sticky="e", padx=10, pady=5)
@@ -373,14 +479,14 @@ id_entry = tk.Entry(saisie)
 id_entry.grid(row=0, column=1, padx=20, pady=5)
 
 ref_label = tk.Label(saisie, text="Ref_analyse", )
-ref_label.grid(row=1, column=0, sticky="e", padx=10, pady=5)
+ref_label.grid(row=2, column=0, sticky="e", padx=10, pady=5)
 ref_entry = tk.Entry(saisie)
-ref_entry.grid(row=1, column=1, padx=20, pady=5)
+ref_entry.grid(row=2, column=1, padx=20, pady=5)
 
 histo_cyto_label = tk.Label(saisie, text="histo ou cyto")
-histo_cyto_label.grid(row=2, column=0, sticky="e", padx=10, pady=5)
+histo_cyto_label.grid(row=1, column=0, sticky="e", padx=10, pady=5)
 histo_cyto_Entry = ttk.Combobox(saisie, values=["h", "c"])
-histo_cyto_Entry.grid(row=2, column=1, padx=20, pady=5)
+histo_cyto_Entry.grid(row=1, column=1, padx=20, pady=5)
 
 date_prelevement_label = tk.Label(saisie, text="Prélevé le :")
 date_prelevement_label.grid(row=3, column=0, sticky="e", padx=10, pady=5)
